@@ -71,6 +71,7 @@ namespace ukb {
 	void set_weight(float w) { m_weight = w;}
 
 	bool is_tgtword() const { return (m_type == cw_tgtword); }
+        bool is_cw_ctxword() const { return (m_type == cw_ctxword); }
 	bool is_disambiguated() const { return m_disamb; }
 	bool is_monosemous() const { return (1 == m_syns.size()); }
 	bool is_synset() const { return m_type == cw_concept; }
@@ -119,7 +120,7 @@ namespace ukb {
 
 	std::ostream & debug(std::ostream & o) const;
 
-  private:
+  protected:
 
 	size_t link_dict_concepts(const std::string & lemma, char pos);
 	void read_from_stream (std::ifstream & is);
@@ -189,7 +190,7 @@ namespace ukb {
 
 	std::ostream & print_csent_simple(std::ostream & o) const;
 
-  private:
+  protected:
 	void read_from_stream (std::ifstream & is);
 	std::ofstream & write_to_stream(std::ofstream & o) const;
 	std::vector<CWord> v;

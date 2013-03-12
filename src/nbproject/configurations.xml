@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configurationDescriptor version="80">
+  <logicalFolder name="root" displayName="root" projectFiles="true" kind="ROOT">
+    <df name="src" root=".">
+      <df name="dotest">
+        <df name="input">
+        </df>
+        <df name="scripts">
+        </df>
+      </df>
+      <in>common.cc</in>
+      <in>common.h</in>
+      <in>compile_kb.cc</in>
+      <in>configFile.cc</in>
+      <in>configFile.h</in>
+      <in>convert2.0.cc</in>
+      <in>csentence.cc</in>
+      <in>csentence.h</in>
+      <in>csentenceSSI.cc</in>
+      <in>csentenceSSI.h</in>
+      <in>dfsa.h</in>
+      <in>disambGraph.cc</in>
+      <in>disambGraph.h</in>
+      <in>fileElem.cc</in>
+      <in>fileElem.h</in>
+      <in>globalVars.cc</in>
+      <in>globalVars.h</in>
+      <in>kbGraph.cc</in>
+      <in>kbGraph.h</in>
+      <in>kbGraph_common.cc</in>
+      <in>kbGraph_common.h</in>
+      <in>kbGraph_v16.cc</in>
+      <in>kbGraph_v16.h</in>
+      <in>prank.h</in>
+      <in>ukb_ppv.cc</in>
+      <in>ukb_wsd.cc</in>
+      <in>version.h</in>
+      <in>wdict.cc</in>
+      <in>wdict.h</in>
+    </df>
+    <logicalFolder name="ExternalFiles"
+                   displayName="Important Files"
+                   projectFiles="false"
+                   kind="IMPORTANT_FILES_FOLDER">
+      <itemPath>Makefile</itemPath>
+      <itemPath>configure</itemPath>
+    </logicalFolder>
+  </logicalFolder>
+  <sourceFolderFilter>^(nbproject)$</sourceFolderFilter>
+  <sourceRootList>
+    <Elem>.</Elem>
+  </sourceRootList>
+  <projectmakefile>Makefile</projectmakefile>
+  <confs>
+    <conf name="Default" type="0">
+      <toolsSet>
+        <remote-sources-mode>LOCAL_SOURCES</remote-sources-mode>
+        <compilerSet>default</compilerSet>
+      </toolsSet>
+      <makefileType>
+        <makeTool>
+          <buildCommandWorkingDir>.</buildCommandWorkingDir>
+          <buildCommand>${MAKE} -f Makefile</buildCommand>
+          <cleanCommand>${MAKE} -f Makefile clean</cleanCommand>
+          <executablePath></executablePath>
+          <ccTool>
+            <incDir>
+              <pElem>/usr/include</pElem>
+            </incDir>
+          </ccTool>
+        </makeTool>
+      </makefileType>
+    </conf>
+  </confs>
+</configurationDescriptor>
