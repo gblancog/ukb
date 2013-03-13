@@ -11,6 +11,7 @@ namespace ukb {
     class CWordSSI : public CWord {
         
     public:
+        CWordSSI(){};
         CWordSSI(const std::string & word, const std::string & id, char pos, cwtype type, float weight);
         CWordSSI(const std::string & word, const std::string & id, char pos, cwtype type, float weight, std::string vertex_string, Kb_vertex_t vertex);
 
@@ -27,7 +28,8 @@ namespace ukb {
     class CSentenceSSI : public CSentence {
         
     public:
-
+        
+        CSentenceSSI() {};
         CSentenceSSI(const std::vector<CWord> & cw_vec, const std::string id) {
             v = cw_vec;
             cs_id = id;

@@ -72,6 +72,7 @@ namespace ukb {
 
 	bool is_tgtword() const { return (m_type == cw_tgtword); }
         bool is_cw_ctxword() const { return (m_type == cw_ctxword); }
+        bool is_tgtword_nopv() const { return (m_type == cw_tgtword_nopv); }
 	bool is_disambiguated() const { return m_disamb; }
 	bool is_monosemous() const { return (1 == m_syns.size()); }
 	bool is_synset() const { return m_type == cw_concept; }
