@@ -47,27 +47,50 @@ using namespace ukb;
 vector<Kb_vertex_t> parents; // vector of parents
 vector<float> dist; // vector of distances
 
-float obtain_distance_dijkstra(Kb_vertex_t v1, Kb_vertex_t v2, const KbGraph & g) {
+/* float obtain_distance_dijkstra(Kb_vertex_t v1, Kb_vertex_t v2, const KbGraph & g) {
 
     // Variable declarations
 
     float distance = 0; // value to return
+    
+    // Hack to remove const-ness
+
+    Kb & me = const_cast<KbGraph &> (g);
+    
+    size_t m = num_vertices(me.graph());
+    if (parents.size() == m) {
+        std::fill(parents.begin(), parents.end(), Kb_vertex_t());
+    } else {
+        vector<Kb_vertex_t > (m).swap(parents); // reset parents
+    }
+    
+    vector<float> w;
+    vector<float> dist(m);
+    property_map<Kb::boost_graph_t, boost::vertex_index_t>::type indexmap = get(vertex_index, me.graph());
+    property_map<Kb::boost_graph_t, float edge_prop_t::*>::type wmap = get(&edge_prop_t::weight, me.graph());
 
     // Calculating Dijkstra Shortest Path using one synset as source. BoostGraph's work
 
-    dijkstra_shortest_paths(g, v1, predecessor_map(&parents[0]).distance_map(&dist[0]));
+    dijkstra_shortest_paths(me.graph(),
+            v1,
+            predecessor_map(make_iterator_property_map(parents.begin(),
+            get(vertex_index, me.graph()))).
+            distance_map(make_iterator_property_map(dist.begin(),
+            get(vertex_index, me.graph()))).
+            weight_map(wmap).
+            vertex_index_map(indexmap));
 
     // Getting the distance between vertex (v1) and vertex (v2)
     graph_traits<KbGraph>::vertex_iterator vi, vend;
-    for (boost::tie(vi, vend) = vertices(g); vi != vend; ++vi) {
+    for (boost::tie(vi, vend) = vertices(me.graph()); vi != vend; ++vi) {
         if (*vi == v2) { //Chosen vertex is our destination vertex (v2).
             distance = dist[*vi];
         }
     }
     return distance;
-}
+} */
 
-float obtain_distance_dijkstra_faster(Kb_vertex_t v1, Kb_vertex_t v2, const KbGraph & g, Kb_vertex_t previous_synset) {
+/* float obtain_distance_dijkstra_faster(Kb_vertex_t v1, Kb_vertex_t v2, const KbGraph & g, Kb_vertex_t previous_synset) {
 
     // Variable declarations
 
@@ -88,7 +111,7 @@ float obtain_distance_dijkstra_faster(Kb_vertex_t v1, Kb_vertex_t v2, const KbGr
         }
     }
     return distance;
-}
+} */
 
 void show_path(Kb_vertex_t v1, Kb_vertex_t v2, const KbGraph & g) {
 
@@ -151,16 +174,17 @@ CSentenceSSI ssi_dijkstra_plus(CSentenceSSI cs, const KbGraph & g, int option) {
                 Kb_vertex_t aux_vertex;
                 bool u;
                 tie(aux_vertex, u) = Kb::instance().get_vertex_by_name(syns.at(0));
-
-                CWordSSI aux_cword;
-                //@Aritza: Cambiar a la nueva version con el type()
-                aux_cword = CWordSSI(it->word(), it->id(), it->get_pos(), it->type(), it->get_weight(), syns.at(0), aux_vertex);
-                //@Aritza: Creamos un if para el nuevo tipo de palabra 3, ya que estas no tienen q entrar en el verctor de interpreted y puede ser monosemica
-                if (!it->is_tgtword_nopv()) {
-                    interpreted.push_back(aux_vertex);
-                    solution_vector.push_back(aux_cword);
-                } else {
-                    pending.push_back(aux_cword);
+                if (u) {
+                    CWordSSI aux_cword;
+                    //@Aritza: Cambiar a la nueva version con el type()
+                    aux_cword = CWordSSI(it->word(), it->id(), it->get_pos(), it->type(), it->get_weight(), syns.at(0), aux_vertex);
+                    //@Aritza: Creamos un if para el nuevo tipo de palabra 3, ya que estas no tienen q entrar en el verctor de interpreted y puede ser monosemica
+                    if (!it->is_tgtword_nopv()) {
+                        interpreted.push_back(aux_vertex);
+                        solution_vector.push_back(aux_cword);
+                    } else {
+                        pending.push_back(aux_cword);
+                    }
                 }
             } else // Polisemical... pending disambiguation 
             {
@@ -185,39 +209,45 @@ CSentenceSSI ssi_dijkstra_plus(CSentenceSSI cs, const KbGraph & g, int option) {
         for (unsigned int j = 0; j < the_synset_vector.size(); j++) {
             Kb_vertex_t actual_synset;
             string actual_synset_word = the_synset_vector.at(j);
-            actual_synset = Kb::instance().get_vertex_by_name(actual_synset_word);
-            float total_weight = 0.0;
-            float d = 0.0;
-            int number_of_synsets = 0;
-            Kb_vertex_t previous_vertex;
-            for (unsigned int k = 1; k < pending.size(); k++) {
-                CWordSSI pending_actual_word = pending.at(k);
-                vector<string> p_synset_vector = pending_actual_word.get_syns_vector();
-                string pending_string_synset = p_synset_vector.at(0);
-                Kb_vertex_t actual_psynset = Kb::instance().get_vertex_by_name(pending_string_synset); // Pending word FIRST synset
-                float actual_weight = 0.0;
+            bool v;
+            tie(actual_synset, v) = Kb::instance().get_vertex_by_name(actual_synset_word);
+            if (v) {
+                float total_weight = 0.0;
+                float d = 0.0;
+                int number_of_synsets = 0;
+                Kb_vertex_t previous_vertex;
+                for (unsigned int k = 1; k < pending.size(); k++) {
+                    CWordSSI pending_actual_word = pending.at(k);
+                    vector<string> p_synset_vector = pending_actual_word.get_syns_vector();
+                    string pending_string_synset = p_synset_vector.at(0);
+                    Kb_vertex_t actual_psynset;
+                    bool w;
+                    tie(actual_psynset, w) = Kb::instance().get_vertex_by_name(pending_string_synset); // Pending word FIRST synset
+                    if (w) {
+                        float actual_weight = 0.0;
 
-                if (option) {
-                    actual_weight = obtain_distance_dijkstra_faster(actual_synset, actual_psynset, g, previous_vertex);
-                    previous_vertex = actual_synset;
-                } else {
-                    actual_weight = obtain_distance_dijkstra(actual_synset, actual_psynset, g);
+                        if (option) {
+                            actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_psynset, previous_vertex, parents, dist);
+                            previous_vertex = actual_synset;
+                        } else {
+                            actual_weight = Kb::instance().obtain_distance_dijsktra(actual_synset, actual_psynset);
+                        }
+
+                        d = actual_weight + 1.0;
+                        total_weight = total_weight + (1 / d);
+                        number_of_synsets++;
+                    }
                 }
-
-                d = actual_weight + 1.0;
-                total_weight = total_weight + (1 / d);
-                number_of_synsets++;
-
-            }
-            //@Aritza: Añadimos la condicion para que solo las palabras que no sean de tipo 3 se tengan en cuenta
-            if (number_of_synsets > 0 && !word_for_disambiguate.is_tgtword_nopv()) {
-                float NewValue = 0.0;
-                NewValue = total_weight / number_of_synsets;
-                if (NewValue > MaxValue) {
-                    MaxValue = NewValue;
-                    BestSense = actual_synset;
-                    index = j;
-                    posicion = o;
+                //@Aritza: Añadimos la condicion para que solo las palabras que no sean de tipo 3 se tengan en cuenta
+                if (number_of_synsets > 0 && !word_for_disambiguate.is_tgtword_nopv()) {
+                    float NewValue = 0.0;
+                    NewValue = total_weight / number_of_synsets;
+                    if (NewValue > MaxValue) {
+                        MaxValue = NewValue;
+                        BestSense = actual_synset;
+                        index = j;
+                        posicion = o;
+                    }
                 }
             }
         }
@@ -248,66 +278,69 @@ CSentenceSSI ssi_dijkstra_plus(CSentenceSSI cs, const KbGraph & g, int option) {
             float MaxValue = 0.0;
             int index = 0;
             for (unsigned int j = 0; j < the_synset_vector.size(); j++) {
-                Kb_vertex_t actual_synset;
                 string actual_synset_word = the_synset_vector.at(j);
-                actual_synset = Kb::instance().get_vertex_by_name(actual_synset_word);
-                float total_weight = 0.0;
-                float d = 0.0;
-                int number_of_synsets = 0;
-                Kb_vertex_t previous_vertex;
-                for (unsigned int k = 0; k < interpreted.size(); k++) {
-                    Kb_vertex_t actual_isynset; // Already interpreted synset
-                    actual_isynset = interpreted.at(k);
-                    float actual_weight = 0.0;
-
-                    if (option) {
-                        actual_weight = obtain_distance_dijkstra_faster(actual_synset, actual_isynset, g, previous_vertex);
-                        previous_vertex = actual_synset;
-                    } else {
-                        actual_weight = obtain_distance_dijkstra(actual_synset, actual_isynset, g);
-                    }
-
-                    d = actual_weight + 1.0;
-                    total_weight = total_weight + (1 / d);
-                    number_of_synsets++;
-
-
-                }
-
-                // Condition: if PoS of actual processing word is 'v' then use FSP for optimize answer
-
-                if (actual_word.get_pos() == 'v') {
-                    for (unsigned int l = 1; l < pending.size(); l++) {
-                        CWordSSI pending_actual_word = pending.at(l);
-                        vector<string> p_synset_vector = pending_actual_word.get_syns_vector();
-                        string pending_string_synset = p_synset_vector.at(0);
-                        Kb_vertex_t actual_psynset = Kb::instance().get_vertex_by_name(pending_string_synset); // Pending word FIRST synset
+                Kb_vertex_t actual_synset;
+                bool x;
+                tie(actual_synset, x) = Kb::instance().get_vertex_by_name(actual_synset_word);
+                if (x) {
+                    float total_weight = 0.0;
+                    float d = 0.0;
+                    int number_of_synsets = 0;
+                    Kb_vertex_t previous_vertex;
+                    for (unsigned int k = 0; k < interpreted.size(); k++) {
+                        Kb_vertex_t actual_isynset; // Already interpreted synset
+                        actual_isynset = interpreted.at(k);
                         float actual_weight = 0.0;
-                        float d = 0.0;
 
                         if (option) {
-                            actual_weight = obtain_distance_dijkstra_faster(actual_synset, actual_psynset, g, previous_vertex);
+                            actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_isynset, previous_vertex, parents, dist);
                             previous_vertex = actual_synset;
                         } else {
-                            actual_weight = obtain_distance_dijkstra(actual_synset, actual_psynset, g);
+                            actual_weight = Kb::instance().obtain_distance_dijsktra(actual_synset, actual_isynset);
                         }
 
                         d = actual_weight + 1.0;
                         total_weight = total_weight + (1 / d);
                         number_of_synsets++;
-
-
                     }
-                }
-                // End FSP	
 
-                if (number_of_synsets > 0) {
-                    float NewValue = 0.0;
-                    NewValue = total_weight / number_of_synsets;
-                    if (NewValue > MaxValue) {
-                        MaxValue = NewValue;
-                        BestSense = actual_synset;
-                        index = j;
+                    // Condition: if PoS of actual processing word is 'v' then use FSP for optimize answer
+
+                    if (actual_word.get_pos() == 'v') {
+                        for (unsigned int l = 1; l < pending.size(); l++) {
+                            CWordSSI pending_actual_word = pending.at(l);
+                            vector<string> p_synset_vector = pending_actual_word.get_syns_vector();
+                            string pending_string_synset = p_synset_vector.at(0);
+                            Kb_vertex_t actual_psynset;
+                            bool y;
+                            tie(actual_psynset, y) = Kb::instance().get_vertex_by_name(pending_string_synset); // Pending word FIRST synset
+                            if (y) {
+                                float actual_weight = 0.0;
+                                float d = 0.0;
+
+                                if (option) {
+                                    actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_psynset, previous_vertex, parents, dist);
+                                    previous_vertex = actual_synset;
+                                } else {
+                                    actual_weight = Kb::instance().obtain_distance_dijsktra(actual_synset, actual_psynset);
+                                }
+
+                                d = actual_weight + 1.0;
+                                total_weight = total_weight + (1 / d);
+                                number_of_synsets++;
+                            }
+                        }
+                    }
+                    // End FSP	
+
+                    if (number_of_synsets > 0) {
+                        float NewValue = 0.0;
+                        NewValue = total_weight / number_of_synsets;
+                        if (NewValue > MaxValue) {
+                            MaxValue = NewValue;
+                            BestSense = actual_synset;
+                            index = j;
+                        }
                     }
                 }
             }
@@ -346,17 +379,21 @@ CSentenceSSI ssi_dijkstra(CSentenceSSI cs, const KbGraph & g, int option) {
         } else {
             if (senses == 1) // Monosemical & disambiguated
             {
-                Kb_vertex_t aux_vertex = Kb::instance().get_vertex_by_name(syns.at(0));
-                CWordSSI aux_cword;
-                //@Aritza: Cambiar el m_type al de la nueva version
-                aux_cword = CWordSSI(it->word(), it->id(), it->get_pos(), it->type(), it->get_weight(), syns.at(0), aux_vertex);
-                //@Aritza: Creamos un if para el nuevo tipo de palabra 3, ya que estas no tienen q entrar en el verctor de interpreted y puede ser monosemica. Si es monosemica la introducimos directamente en el vector pending
+                Kb_vertex_t aux_vertex;
+                bool a;
+                tie(aux_vertex, a) = Kb::instance().get_vertex_by_name(syns.at(0));
+                if (a) {
+                    CWordSSI aux_cword;
+                    //@Aritza: Cambiar el m_type al de la nueva version
+                    aux_cword = CWordSSI(it->word(), it->id(), it->get_pos(), it->type(), it->get_weight(), syns.at(0), aux_vertex);
+                    //@Aritza: Creamos un if para el nuevo tipo de palabra 3, ya que estas no tienen q entrar en el verctor de interpreted y puede ser monosemica. Si es monosemica la introducimos directamente en el vector pending
 
-                if (!it->is_tgtword_nopv()) {
-                    interpreted.push_back(aux_vertex);
-                    solution_vector.push_back(aux_cword);
-                } else {
-                    pending.push_back(aux_cword);
+                    if (!it->is_tgtword_nopv()) {
+                        interpreted.push_back(aux_vertex);
+                        solution_vector.push_back(aux_cword);
+                    } else {
+                        pending.push_back(aux_cword);
+                    }
                 }
             } else // Polisemical... pending disambiguation
             {
@@ -367,7 +404,6 @@ CSentenceSSI ssi_dijkstra(CSentenceSSI cs, const KbGraph & g, int option) {
             }
         }
     }
-
 
     //Aritza: Si el contexto no va a poder ser desambiguado mostramos un mensaje por pantalla indicandolo
     if (interpreted.empty()) cout << "No hay ninguna palabra monosémica ni ningún concepto, por tanto no es posible desambiguar el contexto: " << cs.id() << endl;
@@ -382,40 +418,39 @@ CSentenceSSI ssi_dijkstra(CSentenceSSI cs, const KbGraph & g, int option) {
             float MaxValue = 0.0;
             int index = 0;
             for (unsigned int j = 0; j < the_synset_vector.size(); j++) {
-                Kb_vertex_t actual_synset;
                 string actual_synset_word = the_synset_vector.at(j);
-                actual_synset = Kb::instance().find_or_insert_synset(actual_synset_word);
-                float total_weight = 0.0;
-                float d = 0.0;
-                int number_of_synsets = 0;
-                Kb_vertex_t previous_vertex;
-                for (unsigned int k = 0; k < interpreted.size(); k++) {
-                    Kb_vertex_t actual_isynset; // Already interpreted synset
-                    actual_isynset = interpreted.at(k);
-                    float actual_weight = 0.0;
+                Kb_vertex_t actual_synset;
+                bool z;
+                tie(actual_synset, z) = Kb::instance().get_vertex_by_name(actual_synset_word);
+                if (z) {
+                    float total_weight = 0.0;
+                    float d = 0.0;
+                    int number_of_synsets = 0;
+                    Kb_vertex_t previous_vertex;
+                    for (unsigned int k = 0; k < interpreted.size(); k++) {
+                        Kb_vertex_t actual_isynset; // Already interpreted synset
+                        actual_isynset = interpreted.at(k);
+                        float actual_weight = 0.0;
 
-                    if (option) {
-                        actual_weight = obtain_distance_dijkstra_faster(actual_synset, actual_isynset, g, previous_vertex);
-                        previous_vertex = actual_synset;
-                    } else {
-                        actual_weight = obtain_distance_dijkstra(actual_synset, actual_isynset, g);
+                        if (option) {
+                            actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_isynset, previous_vertex, parents, dist);
+                            previous_vertex = actual_synset;
+                        } else {
+                            actual_weight = Kb::instance().obtain_distance_dijsktra(actual_synset, actual_isynset);
+                        }
+
+                        d = actual_weight + 1.0;
+                        total_weight = total_weight + (1 / d);
+                        number_of_synsets++;
                     }
-
-                    d = actual_weight + 1.0;
-                    total_weight = total_weight + (1 / d);
-                    number_of_synsets++;
-
-
-
-
-                }
-                if (number_of_synsets > 0) {
-                    float NewValue = 0.0;
-                    NewValue = total_weight / number_of_synsets;
-                    if (NewValue > MaxValue) {
-                        MaxValue = NewValue;
-                        BestSense = actual_synset;
-                        index = j;
+                    if (number_of_synsets > 0) {
+                        float NewValue = 0.0;
+                        NewValue = total_weight / number_of_synsets;
+                        if (NewValue > MaxValue) {
+                            MaxValue = NewValue;
+                            BestSense = actual_synset;
+                            index = j;
+                        }
                     }
                 }
             }
@@ -424,10 +459,9 @@ CSentenceSSI ssi_dijkstra(CSentenceSSI cs, const KbGraph & g, int option) {
                 if (!actual_word.is_tgtword_nopv()) interpreted.push_back(BestSense);
                 CWordSSI resolved;
                 //@Aritza: Cambiar el m_type al de la nueva version
-                resolved = CWord(actual_word.word(), actual_word.id(), actual_word.get_pos(), actual_word.type(), actual_word.get_weight(), the_synset_vector.at(index), BestSense);
+                resolved = CWordSSI(actual_word.word(), actual_word.id(), actual_word.get_pos(), actual_word.type(), actual_word.get_weight(), the_synset_vector.at(index), BestSense);
                 solution_vector.push_back(resolved);
                 pending.erase(pending.begin());
-
             }
         }
     }
@@ -441,7 +475,7 @@ CSentenceSSI ssi_dijkstra(CSentenceSSI cs, const KbGraph & g, int option) {
 
 struct polysemy_sorting {
 
-    bool operator() (CWordSSI cw1, CWordSSI cw2) {
+    bool operator() (CWord cw1, CWord cw2) {
         vector<string> syns1 = cw1.get_syns_vector();
         vector<string> syns2 = cw2.get_syns_vector();
 
@@ -453,7 +487,7 @@ struct polysemy_sorting {
 
 struct explicit_sorting {
 
-    bool operator() (CWordSSI cw1, CWordSSI cw2) {
+    bool operator() (CWord cw1, CWord cw2) {
         float w1 = cw1.get_weight();
         float w2 = cw2.get_weight();
 
@@ -465,7 +499,7 @@ struct explicit_sorting {
 
 struct sorting_by_id {
 
-    bool operator() (CWordSSI cw1, CWordSSI cw2) {
+    bool operator() (CWord cw1, CWord cw2) {
         string id1 = cw1.id();
         string id2 = cw2.id();
 
@@ -475,7 +509,7 @@ struct sorting_by_id {
     }
 } id_sorting;
 
-void sort_words(CSentenceSSI & cs, int sort_option) {
+void sort_words(CSentence & cs, int sort_option) {
 
     switch (sort_option) {
         case 0: // Without sorting
@@ -494,7 +528,7 @@ void sort_words(CSentenceSSI & cs, int sort_option) {
 
 }
 
-void sort_by_id(CSentenceSSI & cs) {
+void sort_by_id(CSentence & cs) {
     sort(cs.begin(), cs.end(), id_sorting);
 }
 
@@ -734,7 +768,7 @@ int main(int argc, char *argv[]) {
             //@Aritza: Cambiamos el metodo por el cual se imprimen las palabras
             cs.print_csent_simple_all(cout, no_cnt, cnt_word);
 
-            cs = CSentence(); // Next iteration ...		
+            cs = CSentenceSSI(); // Next iteration ...		
         }
     } catch (std::exception & e) {
         cerr << "Error reading: " << fullname_in << " : " << e.what() << endl;

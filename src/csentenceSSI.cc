@@ -56,9 +56,7 @@ namespace ukb {
             m_pos = pos;
             m_weight = weight;
             m_syns.push_back(vertex_string);
-            //@Aritza: Usar el vertor de tipo 2 <- NO
-            m_V2.push_back(vertex);
-            // m_V.push_back(make_pair(u, 1.0f));
+            m_V.push_back(make_pair(vertex, 1.0f));
             m_type = type;
             m_disamb = false;
         } else {
@@ -67,9 +65,7 @@ namespace ukb {
             m_pos = pos;
             m_weight = weight;
             m_syns.push_back(vertex_string);
-            //@Aritza: Usar el vector de tipo 2 <-?
-            m_V2.push_back(vertex);
-            // m_V.push_back(make_pair(u, 1.0f));
+            m_V.push_back(make_pair(vertex, 1.0f));
             m_type = type;
             m_disamb = true;
         }
@@ -82,7 +78,7 @@ namespace ukb {
             m_weight = cw_.m_weight;
             m_pos = cw_.m_pos;
             m_syns = cw_.m_syns;
-            m_V2 = cw_.m_V2;
+            m_V = cw_.m_V;
             m_ranks = cw_.m_ranks;
             m_disamb = cw_.m_disamb;
             m_type = cw_.m_type; //@Aritza: Añadido
@@ -92,8 +88,8 @@ namespace ukb {
 
     std::ostream & CSentenceSSI::print_csent_simple_all(std::ostream & o, bool no_cnt, bool cnt_word) const {
 
-        vector<CWord>::const_iterator cw_it = v.begin();
-        vector<CWord>::const_iterator cw_end = v.end();
+        vector<CWordSSI>::const_iterator cw_it = v.begin();
+        vector<CWordSSI>::const_iterator cw_end = v.end();
 
         for (; cw_it != cw_end; ++cw_it) {
             if (cw_it->size() == 0) continue;

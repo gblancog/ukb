@@ -191,6 +191,10 @@ public:
   bool bfs (Kb_vertex_t source_synset, std::vector<Kb_vertex_t> & synv) const ;
 
   bool dijkstra (Kb_vertex_t src, std::vector<Kb_vertex_t> & parents) const;
+  
+  float obtain_distance_dijsktra(Kb_vertex_t v1, Kb_vertex_t v2) const;
+  
+  float obtain_distance_dijsktra_faster(Kb_vertex_t v1, Kb_vertex_t v2, Kb_vertex_t previous_synset, std::vector<Kb_vertex_t> & parents, std::vector<float> & dist) const;
 
   void pageRank_ppv(const std::vector<float> & ppv_map,
 					std::vector<float> & ranks);

@@ -32,6 +32,7 @@
       <in>kbGraph_v16.cc</in>
       <in>kbGraph_v16.h</in>
       <in>prank.h</in>
+      <in>ssidijkstrafast.cc</in>
       <in>ukb_ppv.cc</in>
       <in>ukb_wsd.cc</in>
       <in>version.h</in>
