@@ -47,71 +47,68 @@ using namespace ukb;
 vector<Kb_vertex_t> parents; // vector of parents
 vector<float> dist; // vector of distances
 
-/* float obtain_distance_dijkstra(Kb_vertex_t v1, Kb_vertex_t v2, const KbGraph & g) {
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Matrix manipulation methods (SSI-DijkstraFast)
 
-    // Variable declarations
+void create_distance_matrix(vector<Kb_vertex_t> I, vector<CWordSSI> P, float ** matrix) {
 
-    float distance = 0; // value to return
-    
-    // Hack to remove const-ness
+    int number_of_rows = 0;
+    int number_of_columns = 0;
 
-    Kb & me = const_cast<KbGraph &> (g);
-    
-    size_t m = num_vertices(me.graph());
-    if (parents.size() == m) {
-        std::fill(parents.begin(), parents.end(), Kb_vertex_t());
-    } else {
-        vector<Kb_vertex_t > (m).swap(parents); // reset parents
+    unsigned int isize = I.size();
+    unsigned int psize = P.size();
+
+    //Getting the maximum size of the distance matrix (sum of P senses)
+    number_of_columns = isize + psize - 1;
+    for (unsigned int j = 0; j < psize; j++) {
+        vector<string> synset_vector = P.at(j).get_syns_vector();
+        number_of_rows = synset_vector.size() + number_of_rows;
     }
-    
-    vector<float> w;
-    vector<float> dist(m);
-    property_map<Kb::boost_graph_t, boost::vertex_index_t>::type indexmap = get(vertex_index, me.graph());
-    property_map<Kb::boost_graph_t, float edge_prop_t::*>::type wmap = get(&edge_prop_t::weight, me.graph());
 
-    // Calculating Dijkstra Shortest Path using one synset as source. BoostGraph's work
+    matrix = new float * [number_of_rows];
+    for (int i = 0; i < number_of_rows; i++) {
+        matrix[i] = new float[number_of_columns];
+    }
 
-    dijkstra_shortest_paths(me.graph(),
-            v1,
-            predecessor_map(make_iterator_property_map(parents.begin(),
-            get(vertex_index, me.graph()))).
-            distance_map(make_iterator_property_map(dist.begin(),
-            get(vertex_index, me.graph()))).
-            weight_map(wmap).
-            vertex_index_map(indexmap));
-
-    // Getting the distance between vertex (v1) and vertex (v2)
-    graph_traits<KbGraph>::vertex_iterator vi, vend;
-    for (boost::tie(vi, vend) = vertices(me.graph()); vi != vend; ++vi) {
-        if (*vi == v2) { //Chosen vertex is our destination vertex (v2).
-            distance = dist[*vi];
+    Kb_vertex_t previous_vertex;
+    for (unsigned int i = 0; i < isize; i++) {
+        Kb_vertex_t actual_isynset = I.at(i);
+        for (unsigned int j = 0; j < psize; j++) {
+            CWordSSI actual_word = P.at(j);
+            vector<string> synset_vector = actual_word.get_syns_vector();
+            for (unsigned int k = 0; k < synset_vector.size(); k++) {
+                Kb_vertex_t actual_synset;
+                bool x;
+                tie(actual_synset, x) = Kb::instance().get_vertex_by_name(synset_vector.at(k));
+                if (x) {
+                    matrix[k][i] = Kb::instance().obtain_distance_dijsktra_faster(actual_isynset, actual_synset, previous_vertex, parents, dist);
+                    previous_vertex = actual_isynset;
+                }
+            }
         }
     }
-    return distance;
-} */
+}
 
-/* float obtain_distance_dijkstra_faster(Kb_vertex_t v1, Kb_vertex_t v2, const KbGraph & g, Kb_vertex_t previous_synset) {
+void update_distance_matrix(Kb_vertex_t src, vector<CWordSSI> P, float ** matrix, int rowm, int columnm) {
 
-    // Variable declarations
+    Kb_vertex_t previous_vertex;
+    int modifing_row = rowm;
+    int modifing_column = columnm;
 
-    float distance = 0; // value to return
-
-    // Calculating Dijkstra Shortest Path using one synset as source (only if v1 is not already calculated). BoostGraph's work
-
-    if (v1 != previous_synset) {
-        dijkstra_shortest_paths(g, v1, predecessor_map(&parents[0]).distance_map(&dist[0]));
-    }
-
-    // Getting the distance between vertex (v1) and vertex (v2)
-    graph_traits<KbGraph>::vertex_iterator vi, vend;
-    for (boost::tie(vi, vend) = vertices(g); vi != vend; ++vi) {
-        if (*vi == v2) { //Chosen vertex is our destination vertex (v2)
-            distance = dist[*vi];
-            break;
+    for (unsigned int i = 0; i < P.size(); i++) {
+        CWordSSI actual_word = P.at(i);
+        vector<string> synset_vector = actual_word.get_syns_vector();
+        for (unsigned int k = 0; k < synset_vector.size(); k++) {
+            Kb_vertex_t actual_synset;
+            bool x;
+            tie(actual_synset, x) = Kb::instance().get_vertex_by_name(synset_vector.at(k));
+            if (x) {
+                matrix[modifing_row][modifing_column] = Kb::instance().obtain_distance_dijsktra_faster(src, actual_synset, previous_vertex, parents, dist);
+            }
+            modifing_row++;
         }
     }
-    return distance;
-} */
+}
 
 void show_path(Kb_vertex_t v1, Kb_vertex_t v2, const KbGraph & g) {
 
@@ -146,9 +143,236 @@ void show_path(Kb_vertex_t v1, Kb_vertex_t v2, const KbGraph & g) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// SSI-Dijkstra & SSI-Dijkstra+
+// SSI-Dijkstra, SSI-Dijkstra+ & SSI-Dijkstra-Fast
 
-CSentenceSSI ssi_dijkstra_plus(CSentenceSSI cs, const KbGraph & g, int option) {
+CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
+
+    vector<Kb_vertex_t> interpreted; // I
+    vector<CWordSSI> pending; // P
+    vector<CWordSSI> solution_vector; // Auxiliar CWord for solution
+    float **dijkstra_matrix; // Matrix in which we will store the distance between different
+    // Kb_vertex_t
+    int row_modifier = 0; // How many matrix rows we already used
+    int column_modifier = 0; // In which column we need to update the matrix info next
+
+    CSentence::iterator it;
+    CSentence::iterator end = cs.end();
+    //@Aritza: Variable que usaremos para saber que elemento del Csentences hemos añadido ya a la lista de interpreted y borrarlo de los pending 	
+    int posicion;
+
+    string id = cs.id();
+
+    // First step - part one: Initializing main data structs
+    for (it = cs.begin(); it != end; ++it) {
+        vector<string> syns = it->get_syns_vector();
+        int senses = syns.size();
+        if (senses == 0) // No senses for this word, dude!
+        {
+            continue; // As this word doesn't is in KbGraph, we continue processing other words
+        } else {
+            if (senses == 1) // Monosemical & disambiguated
+            {
+                Kb_vertex_t aux_vertex;
+                bool u;
+                tie(aux_vertex, u) = Kb::instance().get_vertex_by_name(syns.at(0));
+                if (u) {
+                    CWordSSI aux_cword;
+                    //@Aritza: Cambiar a la nueva version con el type()
+                    aux_cword = CWordSSI(it->word(), it->id(), it->get_pos(), it->type(), it->get_weight(), syns.at(0), aux_vertex);
+                    //@Aritza: Creamos un if para el nuevo tipo de palabra 3, ya que estas no tienen q entrar en el verctor de interpreted y puede ser monosemica
+                    if (!it->is_tgtword_nopv()) {
+                        interpreted.push_back(aux_vertex);
+                        solution_vector.push_back(aux_cword);
+                    } else {
+                        pending.push_back(aux_cword);
+                    }
+                }
+            } else // Polisemical... pending disambiguation 
+            {
+                CWordSSI aux_cword;
+                //@Aritza: Cambiar a la nueva version con el type()
+                aux_cword = CWordSSI(it->word(), it->id(), it->get_pos(), it->type(), it->get_weight());
+                pending.push_back(aux_cword);
+            }
+        }
+    }
+
+    // First step - part two: If there are no monosemical words, pass one pair <word, sense> from P to I using FSI
+
+    //@Aritza: Cambiamos if por for por si la 1º o las siguientes palabras llevan un 3, lo recorre asta q encuentra una palabra q no sea 3
+
+    for (unsigned int o = 0; interpreted.empty() && o < pending.size(); o++) {
+        CWordSSI word_for_disambiguate = pending.at(o);
+        vector<string> the_synset_vector = word_for_disambiguate.get_syns_vector();
+        Kb_vertex_t BestSense;
+        float MaxValue = 0.0;
+        int index = 0;
+        for (unsigned int j = 0; j < the_synset_vector.size(); j++) {
+            Kb_vertex_t actual_synset;
+            string actual_synset_word = the_synset_vector.at(j);
+            bool v;
+            tie(actual_synset, v) = Kb::instance().get_vertex_by_name(actual_synset_word);
+            if (v) {
+                float total_weight = 0.0;
+                float d = 0.0;
+                int number_of_synsets = 0;
+                Kb_vertex_t previous_vertex;
+                for (unsigned int k = 1; k < pending.size(); k++) {
+                    CWordSSI pending_actual_word = pending.at(k);
+                    vector<string> p_synset_vector = pending_actual_word.get_syns_vector();
+                    string pending_string_synset = p_synset_vector.at(0);
+                    Kb_vertex_t actual_psynset;
+                    bool w;
+                    tie(actual_psynset, w) = Kb::instance().get_vertex_by_name(pending_string_synset); // Pending word FIRST synset
+                    if (w) {
+                        float actual_weight = 0.0;
+
+                        if (option) {
+                            actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_psynset, previous_vertex, parents, dist);
+                            previous_vertex = actual_synset;
+                        } else {
+                            actual_weight = Kb::instance().obtain_distance_dijsktra(actual_synset, actual_psynset);
+                        }
+
+                        d = actual_weight + 1.0;
+                        total_weight = total_weight + (1 / d);
+                        number_of_synsets++;
+                    }
+                }
+                //@Aritza: Añadimos la condicion para que solo las palabras que no sean de tipo 3 se tengan en cuenta
+                if (number_of_synsets > 0 && !word_for_disambiguate.is_tgtword_nopv()) {
+                    float NewValue = 0.0;
+                    NewValue = total_weight / number_of_synsets;
+                    if (NewValue > MaxValue) {
+                        MaxValue = NewValue;
+                        BestSense = actual_synset;
+                        index = j;
+                        posicion = o;
+                    }
+                }
+            }
+        }
+        if (MaxValue > 0) {
+            interpreted.push_back(BestSense);
+            CWordSSI resolved;
+            //@Aritza: Cambiar a la nueva version con el type()
+            resolved = CWordSSI(word_for_disambiguate.word(), word_for_disambiguate.id(), word_for_disambiguate.get_pos(), word_for_disambiguate.type(), word_for_disambiguate.get_weight(), the_synset_vector.at(index), BestSense);
+            solution_vector.push_back(resolved);
+            //@Aritza: Ahora no tenemos que eliminar la primera, sino la que hemos metido en el interpreted
+            pending.erase(pending.begin() + posicion);
+        }
+    }
+    // End FSI
+
+    // Second step: Disambiguation
+
+    //@Aritza: Si todas las palabras son de tipo 3 es imposible desambiguar el contexto
+    if (interpreted.empty()) cout << "Todas las palabras son de tipo: target 'nopv' word (3), por tanto no es posible desambiguar el contexto: " << cs.id() << endl;
+
+    if (!interpreted.empty()) // If there is only one word, interpreted will be empty... 
+    {
+        //We'll try to avoid calling Dijkstra too much by storing distances on a matrix
+        create_distance_matrix(interpreted, pending, dijkstra_matrix);
+        column_modifier = interpreted.size();
+
+        CWordSSI actual_word;
+        while (!pending.empty()) {
+            actual_word = pending.at(0);
+            vector<string> the_synset_vector = actual_word.get_syns_vector();
+            Kb_vertex_t BestSense;
+            float MaxValue = 0.0;
+            int index = 0;
+            for (unsigned int j = 0; j < the_synset_vector.size(); j++) {
+                string actual_synset_word = the_synset_vector.at(j);
+                Kb_vertex_t actual_synset;
+                bool x;
+                tie(actual_synset, x) = Kb::instance().get_vertex_by_name(actual_synset_word);
+                if (x) {
+                    float total_weight = 0.0;
+                    float d = 0.0;
+                    int number_of_synsets = 0;
+                    Kb_vertex_t previous_vertex;
+                    for (unsigned int k = 0; k < interpreted.size(); k++) {
+                        Kb_vertex_t actual_isynset; // Already interpreted synset
+                        actual_isynset = interpreted.at(k);
+                        float actual_weight = 0.0;
+
+                        if (option) {
+                            actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_isynset, previous_vertex, parents, dist);
+                            previous_vertex = actual_synset;
+                        } else {
+                            actual_weight = Kb::instance().obtain_distance_dijsktra(actual_synset, actual_isynset);
+                        }
+
+                        d = actual_weight + 1.0;
+                        total_weight = total_weight + (1 / d);
+                        number_of_synsets++;
+                    }
+
+                    // Condition: if PoS of actual processing word is 'v' then use FSP for optimize answer
+
+                    if (actual_word.get_pos() == 'v') {
+                        for (unsigned int l = 1; l < pending.size(); l++) {
+                            CWordSSI pending_actual_word = pending.at(l);
+                            vector<string> p_synset_vector = pending_actual_word.get_syns_vector();
+                            string pending_string_synset = p_synset_vector.at(0);
+                            Kb_vertex_t actual_psynset;
+                            bool y;
+                            tie(actual_psynset, y) = Kb::instance().get_vertex_by_name(pending_string_synset); // Pending word FIRST synset
+                            if (y) {
+                                float actual_weight = 0.0;
+                                float d = 0.0;
+
+                                if (option) {
+                                    actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_psynset, previous_vertex, parents, dist);
+                                    previous_vertex = actual_synset;
+                                } else {
+                                    actual_weight = Kb::instance().obtain_distance_dijsktra(actual_synset, actual_psynset);
+                                }
+
+                                d = actual_weight + 1.0;
+                                total_weight = total_weight + (1 / d);
+                                number_of_synsets++;
+                            }
+                        }
+                    }
+                    // End FSP	
+
+                    if (number_of_synsets > 0) {
+                        float NewValue = 0.0;
+                        NewValue = total_weight / number_of_synsets;
+                        if (NewValue > MaxValue) {
+                            MaxValue = NewValue;
+                            BestSense = actual_synset;
+                            index = j;
+                        }
+                    }
+                }
+            }
+            if (MaxValue > 0) {
+                //@Aritza: Creamos un if para el nuevo tipo de palabra 3, ya que estas no tienen q entrar en el vector de interpreted
+                if (!actual_word.is_tgtword_nopv()) {
+                    interpreted.push_back(BestSense);
+                }
+                CWordSSI resolved;
+                //@Aritza: Cambiar a la nueva version con el type()
+                resolved = CWordSSI(actual_word.word(), actual_word.id(), actual_word.get_pos(), actual_word.type(), actual_word.get_weight(), the_synset_vector.at(index), BestSense);
+                solution_vector.push_back(resolved);
+                pending.erase(pending.begin());
+
+                // Udpate matrix info with new interpreted item (only if pending has more items)
+                if (!pending.empty()) {
+                    row_modifier = row_modifier + the_synset_vector.size();
+                    update_distance_matrix(BestSense, pending, dijkstra_matrix, row_modifier, column_modifier);
+                    column_modifier++;
+                }
+            }
+        }
+    }
+    return CSentenceSSI(solution_vector, id);
+}
+
+CSentenceSSI ssi_dijkstra_plus(CSentenceSSI cs, int option) {
 
     vector<Kb_vertex_t> interpreted; // I
     vector<CWordSSI> pending; // P
@@ -358,7 +582,7 @@ CSentenceSSI ssi_dijkstra_plus(CSentenceSSI cs, const KbGraph & g, int option) {
     return CSentenceSSI(solution_vector, id);
 }
 
-CSentenceSSI ssi_dijkstra(CSentenceSSI cs, const KbGraph & g, int option) {
+CSentenceSSI ssi_dijkstra(CSentenceSSI cs, int option) {
 
     vector<Kb_vertex_t> interpreted; // I
     vector<CWordSSI> pending; // P
@@ -727,7 +951,7 @@ int main(int argc, char *argv[]) {
     // Adding dictionary 
     if (insert_all_dict) {
         //@Aritza: Ya no es necesario pasarle el peso
-        kb.add_dictionary();
+        kb.add_dictionary(); //TODO: Corregir referencia sin definir
     }
 
     // Initializing parents and distance vectors (dijkstra_shortest_paths)	
@@ -752,15 +976,15 @@ int main(int argc, char *argv[]) {
                 CSentenceSSI::iterator end = cs.end();
                 for (; it != end; ++it) {
                     //@Aritza: Ya no es necesario pasarle el peso
-                    kb.add_token(it->word());
+                    kb.add_token(it->word()); //TODO: Corregir referencia sin definir
                 }
             }
 
             sort_words(cs, sort_method);
             if (use_only_ssid) {
-                cs = ssi_dijkstra(cs, kb.graph(), dsp_option);
+                cs = ssi_dijkstra(cs, dsp_option);
             } else {
-                cs = ssi_dijkstra_plus(cs, kb.graph(), dsp_option);
+                cs = ssi_dijkstra_plus(cs, dsp_option);
             }
             if (pretty_mode) {
                 sort_by_id(cs); // Just a little pretty thing
