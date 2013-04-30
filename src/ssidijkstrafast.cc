@@ -46,11 +46,12 @@ using namespace ukb;
 
 vector<Kb_vertex_t> parents; // vector of parents
 vector<float> dist; // vector of distances
+float **dijkstra_matrix; // Matrix in which we will store the distance between different Kb_vertex_t
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Matrix manipulation methods (SSI-DijkstraFast)
 
-void create_distance_matrix(vector<Kb_vertex_t> I, vector<CWordSSI> P, float ** matrix) {
+void create_distance_matrix(vector<Kb_vertex_t> I, vector<CWordSSI> P) {
 
     int number_of_rows = 0;
     int number_of_columns = 0;
@@ -65,9 +66,9 @@ void create_distance_matrix(vector<Kb_vertex_t> I, vector<CWordSSI> P, float ** 
         number_of_rows = synset_vector.size() + number_of_rows;
     }
 
-    matrix = new float * [number_of_rows];
+    dijkstra_matrix = new float * [number_of_rows];
     for (int i = 0; i < number_of_rows; i++) {
-        matrix[i] = new float[number_of_columns];
+        dijkstra_matrix[i] = new float[number_of_columns];
     }
 
     Kb_vertex_t previous_vertex;
@@ -81,7 +82,7 @@ void create_distance_matrix(vector<Kb_vertex_t> I, vector<CWordSSI> P, float ** 
                 bool x;
                 tie(actual_synset, x) = Kb::instance().get_vertex_by_name(synset_vector.at(k));
                 if (x) {
-                    matrix[k][i] = Kb::instance().obtain_distance_dijsktra_faster(actual_isynset, actual_synset, previous_vertex, parents, dist);
+                    dijkstra_matrix[k][i] = Kb::instance().obtain_distance_dijsktra_faster(actual_isynset, actual_synset, previous_vertex, parents, dist);
                     previous_vertex = actual_isynset;
                 }
             }
@@ -89,7 +90,7 @@ void create_distance_matrix(vector<Kb_vertex_t> I, vector<CWordSSI> P, float ** 
     }
 }
 
-void update_distance_matrix(Kb_vertex_t src, vector<CWordSSI> P, float ** matrix, int rowm, int columnm) {
+void update_distance_matrix(Kb_vertex_t src, vector<CWordSSI> P, int rowm, int columnm) {
 
     Kb_vertex_t previous_vertex;
     int modifing_row = rowm;
@@ -103,7 +104,7 @@ void update_distance_matrix(Kb_vertex_t src, vector<CWordSSI> P, float ** matrix
             bool x;
             tie(actual_synset, x) = Kb::instance().get_vertex_by_name(synset_vector.at(k));
             if (x) {
-                matrix[modifing_row][modifing_column] = Kb::instance().obtain_distance_dijsktra_faster(src, actual_synset, previous_vertex, parents, dist);
+                dijkstra_matrix[modifing_row][modifing_column] = Kb::instance().obtain_distance_dijsktra_faster(src, actual_synset, previous_vertex, parents, dist);
             }
             modifing_row++;
         }
@@ -150,8 +151,8 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
     vector<Kb_vertex_t> interpreted; // I
     vector<CWordSSI> pending; // P
     vector<CWordSSI> solution_vector; // Auxiliar CWord for solution
-    float **dijkstra_matrix; // Matrix in which we will store the distance between different
-    // Kb_vertex_t
+
+    
     int row_modifier = 0; // How many matrix rows we already used
     int column_modifier = 0; // In which column we need to update the matrix info next
 
@@ -272,7 +273,7 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
     if (!interpreted.empty()) // If there is only one word, interpreted will be empty... 
     {
         //We'll try to avoid calling Dijkstra too much by storing distances on a matrix
-        create_distance_matrix(interpreted, pending, dijkstra_matrix);
+        create_distance_matrix(interpreted, pending);
         column_modifier = interpreted.size();
 
         CWordSSI actual_word;
@@ -296,9 +297,8 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
                         Kb_vertex_t actual_isynset; // Already interpreted synset
                         actual_isynset = interpreted.at(k);
                         float actual_weight = 0.0;
-
                         if (option) {
-                            actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_isynset, previous_vertex, parents, dist);
+                            actual_weight = dijkstra_matrix[j][k];
                             previous_vertex = actual_synset;
                         } else {
                             actual_weight = Kb::instance().obtain_distance_dijsktra(actual_synset, actual_isynset);
@@ -363,7 +363,7 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
                 // Udpate matrix info with new interpreted item (only if pending has more items)
                 if (!pending.empty()) {
                     row_modifier = row_modifier + the_synset_vector.size();
-                    update_distance_matrix(BestSense, pending, dijkstra_matrix, row_modifier, column_modifier);
+                    update_distance_matrix(BestSense, pending, row_modifier, column_modifier);
                     column_modifier++;
                 }
             }
@@ -783,11 +783,18 @@ int main(int argc, char *argv[]) {
         faster
     };
 
+    // Dijkstra Algorithm
+
+    enum dijkstra_method {
+        basic,
+        plus,
+        fast
+    };
+
     sorting sort_method = no_explicit;
     dijkstra_option dsp_option = faster;
+    dijkstra_method dij_option = fast;
 
-    bool insert_all_dict = true;
-    bool use_only_ssid = false;
     bool pretty_mode = false;
     //@Aritza:añadinos la nueva variable para especificar que no queremos mostros las palabras ya desambiguadas	
     bool no_cnt = false;
@@ -815,8 +822,6 @@ int main(int argc, char *argv[]) {
             ("version", "Show version")
             ("kb_binfile,K", value<string > (), "Binary file of KB (see compile_kb). Default is kb_wnet_weights.bin")
             ("dict_file,D", value<string > (), "Dictionary text file. Default is dict.txt")
-            ("dict_weight", "Use weights when linking words to concepts (dict file has to have weights)")
-            ("only_ctx_words,C", "Insert only words appearing in contexts to the graph (default is insert all dictionary words)")
             ("pretty", "Use this option for sort the words by id before disambiguation")
             ;
 
@@ -825,6 +830,13 @@ int main(int argc, char *argv[]) {
             ("nexp", "No explicit sorting. This is default option")
             ("poly", "Sorting by polysemy degree")
             ("expl", "Sorting by explicit sorting (given by user)")
+            ;
+
+    options_description po_method("SSI Dijkstra method");
+    po_method.add_options()
+            ("basic", "Basic SSI Dijkstra method")
+            ("plus", "SSI Dijkstra plus method")
+            ("fast", "SSI Dijstra fast method")
             ;
 
     options_description po_ssid("SSI Dijkstra options");
@@ -843,7 +855,7 @@ int main(int argc, char *argv[]) {
             ;
 
     options_description po_visible(desc_header);
-    po_visible.add(po_general).add(po_sorting).add(po_ssid);
+    po_visible.add(po_general).add(po_sorting).add(po_method).add(po_ssid);
 
     options_description po_all("All options");
     po_all.add(po_visible).add(po_hidden);
@@ -880,10 +892,6 @@ int main(int argc, char *argv[]) {
             glVars::dict_filename = vm["dict_file"].as<string > ();
         }
 
-        if (vm.count("only_ctx_words")) {
-            insert_all_dict = false;
-        }
-
         if (vm.count("pretty")) {
             pretty_mode = true;
         }
@@ -901,15 +909,25 @@ int main(int argc, char *argv[]) {
         if (vm.count("expl")) {
             sort_method = explicit_sorting;
         }
+        
+        // Program options: SSI Dijkstra method
+        
+        if (vm.count("basic")) {
+            dij_option = basic;
+        }
+        
+        if (vm.count("plus")) {
+            dij_option = plus;
+        }
+        
+        if (vm.count("fast")) {
+            dij_option = fast;
+        }
 
-        // Program options: SSI Dijkstra
+        // Program options: SSI Dijkstra 
 
         if (vm.count("no-opt")) {
             dsp_option = normal;
-        }
-
-        if (vm.count("ssid")) {
-            use_only_ssid = true;
         }
 
         //@Aritza: Additional options
@@ -949,10 +967,12 @@ int main(int argc, char *argv[]) {
 
     CSentenceSSI cs;
     // Adding dictionary 
-    if (insert_all_dict) {
+    /* 
+       if (insert_all_dict) {
         //@Aritza: Ya no es necesario pasarle el peso
         kb.add_dictionary(); //TODO: Corregir referencia sin definir
-    }
+    } 
+     */
 
     // Initializing parents and distance vectors (dijkstra_shortest_paths)	
     size_t m = num_vertices(kb.graph());
@@ -970,7 +990,8 @@ int main(int argc, char *argv[]) {
     size_t l_n = 0;
     try {
         while (cs.read_aw(fh_in, l_n)) {
-            if (!insert_all_dict) {
+            /* 
+               if (!insert_all_dict) {
                 // Add CSentence words to graph
                 CSentenceSSI::iterator it = cs.begin();
                 CSentenceSSI::iterator end = cs.end();
@@ -978,13 +999,24 @@ int main(int argc, char *argv[]) {
                     //@Aritza: Ya no es necesario pasarle el peso
                     kb.add_token(it->word()); //TODO: Corregir referencia sin definir
                 }
-            }
+            } 
+             */
 
             sort_words(cs, sort_method);
-            if (use_only_ssid) {
-                cs = ssi_dijkstra(cs, dsp_option);
-            } else {
-                cs = ssi_dijkstra_plus(cs, dsp_option);
+            switch (dij_option) {
+                case basic:
+                    cs = ssi_dijkstra(cs, dsp_option);
+                    break;
+
+                case plus:
+                    cs = ssi_dijkstra_plus(cs, dsp_option);
+                    break;
+
+                case fast:
+                    cs = ssi_dijkstra_fast(cs, dsp_option);
+                    break;
+                default:
+                    break;
             }
             if (pretty_mode) {
                 sort_by_id(cs); // Just a little pretty thing

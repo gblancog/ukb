@@ -2,6 +2,7 @@
 #define CSENTENCESSI_H
 
 #include "csentence.h"
+#include "kbGraph.h"
 #include <string>
 #include <vector>
 
@@ -19,18 +20,6 @@ namespace ukb {
 
         bool is_tgtword_nopv() const {
             return (m_type == cw_tgtword_nopv);
-        }
-        
-        std::vector<std::string> get_syns_vector() const {
-            return m_syns;
-        }
-        
-        float get_weight() const {
-            return m_weight;
-        }
-        
-        std::string id() const {
-            return m_id;
         }
 
         CWordSSI & operator=(const CWordSSI & cs_);
