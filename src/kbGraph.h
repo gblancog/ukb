@@ -194,7 +194,9 @@ public:
   
   float obtain_distance_dijsktra(Kb_vertex_t v1, Kb_vertex_t v2) const;
   
-  float obtain_distance_dijsktra_faster(Kb_vertex_t v1, Kb_vertex_t v2, Kb_vertex_t previous_synset, std::vector<Kb_vertex_t> & parents, std::vector<float> & dist) const;
+  float obtain_distance_dijsktra_faster(Kb_vertex_t v1, Kb_vertex_t v2, Kb_vertex_t previous_synset);
+  
+  std::vector<Kb_vertex_t> get_parents() const {return parent_vector;}
 
   void pageRank_ppv(const std::vector<float> & ppv_map,
 					std::vector<float> & ranks);
@@ -249,6 +251,8 @@ private:
   size_t m_vertexN;                        // Number of vertices
   size_t m_edgeN;                          // Number of edges
   std::vector<float> m_static_ppv;         // aux. vector with static prank computation
+  std::vector<Kb_vertex_t> parent_vector;  // vector of parents
+  std::vector<float> distance_vector;      // vector of distances
   };
 }
 

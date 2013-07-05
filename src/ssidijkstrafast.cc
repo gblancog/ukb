@@ -44,9 +44,8 @@ using namespace ukb;
 
 // Global variables
 
-vector<Kb_vertex_t> parents; // vector of parents
-vector<float> dist; // vector of distances
 float **dijkstra_matrix; // Matrix in which we will store the distance between different Kb_vertex_t
+int rows; // Number of rows of the Dijkstra matrix
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Matrix manipulation methods (SSI-DijkstraFast)
@@ -66,12 +65,14 @@ void create_distance_matrix(vector<Kb_vertex_t> I, vector<CWordSSI> P) {
         number_of_rows = synset_vector.size() + number_of_rows;
     }
 
+    rows = number_of_rows;
+
     dijkstra_matrix = new float * [number_of_rows];
     for (int i = 0; i < number_of_rows; i++) {
         dijkstra_matrix[i] = new float[number_of_columns];
     }
 
-    Kb_vertex_t previous_vertex;
+    Kb_vertex_t previous_vertex = 0;
     for (unsigned int i = 0; i < isize; i++) {
         Kb_vertex_t actual_isynset = I.at(i);
         for (unsigned int j = 0; j < psize; j++) {
@@ -82,7 +83,7 @@ void create_distance_matrix(vector<Kb_vertex_t> I, vector<CWordSSI> P) {
                 bool x;
                 tie(actual_synset, x) = Kb::instance().get_vertex_by_name(synset_vector.at(k));
                 if (x) {
-                    dijkstra_matrix[k][i] = Kb::instance().obtain_distance_dijsktra_faster(actual_isynset, actual_synset, previous_vertex, parents, dist);
+                    dijkstra_matrix[k][i] = Kb::instance().obtain_distance_dijsktra_faster(actual_isynset, actual_synset, previous_vertex);
                     previous_vertex = actual_isynset;
                 }
             }
@@ -92,7 +93,7 @@ void create_distance_matrix(vector<Kb_vertex_t> I, vector<CWordSSI> P) {
 
 void update_distance_matrix(Kb_vertex_t src, vector<CWordSSI> P, int rowm, int columnm) {
 
-    Kb_vertex_t previous_vertex;
+    Kb_vertex_t previous_vertex = 0;
     int modifing_row = rowm;
     int modifing_column = columnm;
 
@@ -104,15 +105,23 @@ void update_distance_matrix(Kb_vertex_t src, vector<CWordSSI> P, int rowm, int c
             bool x;
             tie(actual_synset, x) = Kb::instance().get_vertex_by_name(synset_vector.at(k));
             if (x) {
-                dijkstra_matrix[modifing_row][modifing_column] = Kb::instance().obtain_distance_dijsktra_faster(src, actual_synset, previous_vertex, parents, dist);
+                dijkstra_matrix[modifing_row][modifing_column] = Kb::instance().obtain_distance_dijsktra_faster(src, actual_synset, previous_vertex);
+                modifing_row++;
             }
-            modifing_row++;
         }
     }
 }
 
+void delete_distance_matrix() {
+    for (int i = 0; i < rows; i++) {
+        delete [] dijkstra_matrix[i];
+    }
+    delete [] dijkstra_matrix;
+}
+
 void show_path(Kb_vertex_t v1, Kb_vertex_t v2, const KbGraph & g) {
 
+    vector<Kb_vertex_t> parents = Kb::instance().get_parents();
     graph_traits<KbGraph>::vertex_iterator vi, vend;
     vector<Kb_vertex_t> vertex_vector;
     for (boost::tie(vi, vend) = vertices(g); vi != vend; ++vi) {
@@ -152,7 +161,7 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
     vector<CWordSSI> pending; // P
     vector<CWordSSI> solution_vector; // Auxiliar CWord for solution
 
-    
+
     int row_modifier = 0; // How many matrix rows we already used
     int column_modifier = 0; // In which column we need to update the matrix info next
 
@@ -217,7 +226,7 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
                 float total_weight = 0.0;
                 float d = 0.0;
                 int number_of_synsets = 0;
-                Kb_vertex_t previous_vertex;
+                Kb_vertex_t previous_vertex = 0;
                 for (unsigned int k = 1; k < pending.size(); k++) {
                     CWordSSI pending_actual_word = pending.at(k);
                     vector<string> p_synset_vector = pending_actual_word.get_syns_vector();
@@ -229,7 +238,7 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
                         float actual_weight = 0.0;
 
                         if (option) {
-                            actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_psynset, previous_vertex, parents, dist);
+                            actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_psynset, previous_vertex);
                             previous_vertex = actual_synset;
                         } else {
                             actual_weight = Kb::instance().obtain_distance_dijsktra(actual_synset, actual_psynset);
@@ -284,6 +293,7 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
             float MaxValue = 0.0;
             int index = 0;
             for (unsigned int j = 0; j < the_synset_vector.size(); j++) {
+                unsigned int row = j + row_modifier;
                 string actual_synset_word = the_synset_vector.at(j);
                 Kb_vertex_t actual_synset;
                 bool x;
@@ -292,14 +302,15 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
                     float total_weight = 0.0;
                     float d = 0.0;
                     int number_of_synsets = 0;
-                    Kb_vertex_t previous_vertex;
+                    Kb_vertex_t previous_vertex = 0;
                     for (unsigned int k = 0; k < interpreted.size(); k++) {
                         Kb_vertex_t actual_isynset; // Already interpreted synset
                         actual_isynset = interpreted.at(k);
                         float actual_weight = 0.0;
                         if (option) {
-                            actual_weight = dijkstra_matrix[j][k];
-                            previous_vertex = actual_synset;
+                            actual_weight = dijkstra_matrix[row][k];
+                            cout << "Row: " << row << " + Column: " << k << " (Total:" << rows << ")" << endl;
+                            cout << "Row_Mod: " << row_modifier << " + Column_Mod: " << column_modifier << endl;
                         } else {
                             actual_weight = Kb::instance().obtain_distance_dijsktra(actual_synset, actual_isynset);
                         }
@@ -324,7 +335,7 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
                                 float d = 0.0;
 
                                 if (option) {
-                                    actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_psynset, previous_vertex, parents, dist);
+                                    actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_psynset, previous_vertex);
                                     previous_vertex = actual_synset;
                                 } else {
                                     actual_weight = Kb::instance().obtain_distance_dijsktra(actual_synset, actual_psynset);
@@ -369,6 +380,7 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
             }
         }
     }
+    delete_distance_matrix();
     return CSentenceSSI(solution_vector, id);
 }
 
@@ -439,7 +451,7 @@ CSentenceSSI ssi_dijkstra_plus(CSentenceSSI cs, int option) {
                 float total_weight = 0.0;
                 float d = 0.0;
                 int number_of_synsets = 0;
-                Kb_vertex_t previous_vertex;
+                Kb_vertex_t previous_vertex = 0;
                 for (unsigned int k = 1; k < pending.size(); k++) {
                     CWordSSI pending_actual_word = pending.at(k);
                     vector<string> p_synset_vector = pending_actual_word.get_syns_vector();
@@ -451,7 +463,7 @@ CSentenceSSI ssi_dijkstra_plus(CSentenceSSI cs, int option) {
                         float actual_weight = 0.0;
 
                         if (option) {
-                            actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_psynset, previous_vertex, parents, dist);
+                            actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_psynset, previous_vertex);
                             previous_vertex = actual_synset;
                         } else {
                             actual_weight = Kb::instance().obtain_distance_dijsktra(actual_synset, actual_psynset);
@@ -510,15 +522,19 @@ CSentenceSSI ssi_dijkstra_plus(CSentenceSSI cs, int option) {
                     float total_weight = 0.0;
                     float d = 0.0;
                     int number_of_synsets = 0;
-                    Kb_vertex_t previous_vertex;
+                    Kb_vertex_t previous_vertex = 0;
                     for (unsigned int k = 0; k < interpreted.size(); k++) {
                         Kb_vertex_t actual_isynset; // Already interpreted synset
                         actual_isynset = interpreted.at(k);
                         float actual_weight = 0.0;
 
                         if (option) {
-                            actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_isynset, previous_vertex, parents, dist);
+                            actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_isynset, previous_vertex);
                             previous_vertex = actual_synset;
+                            /* //Debug
+                            if (actual_word.word().compare("together") == 0){
+                                show_path(actual_synset, actual_isynset, Kb::instance().graph());
+                            } */
                         } else {
                             actual_weight = Kb::instance().obtain_distance_dijsktra(actual_synset, actual_isynset);
                         }
@@ -543,7 +559,7 @@ CSentenceSSI ssi_dijkstra_plus(CSentenceSSI cs, int option) {
                                 float d = 0.0;
 
                                 if (option) {
-                                    actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_psynset, previous_vertex, parents, dist);
+                                    actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_psynset, previous_vertex);
                                     previous_vertex = actual_synset;
                                 } else {
                                     actual_weight = Kb::instance().obtain_distance_dijsktra(actual_synset, actual_psynset);
@@ -650,14 +666,14 @@ CSentenceSSI ssi_dijkstra(CSentenceSSI cs, int option) {
                     float total_weight = 0.0;
                     float d = 0.0;
                     int number_of_synsets = 0;
-                    Kb_vertex_t previous_vertex;
+                    Kb_vertex_t previous_vertex = 0;
                     for (unsigned int k = 0; k < interpreted.size(); k++) {
                         Kb_vertex_t actual_isynset; // Already interpreted synset
                         actual_isynset = interpreted.at(k);
                         float actual_weight = 0.0;
 
                         if (option) {
-                            actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_isynset, previous_vertex, parents, dist);
+                            actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_isynset, previous_vertex);
                             previous_vertex = actual_synset;
                         } else {
                             actual_weight = Kb::instance().obtain_distance_dijsktra(actual_synset, actual_isynset);
@@ -739,17 +755,15 @@ void sort_words(CSentence & cs, int sort_option) {
         case 0: // Without sorting
             break;
 
-        case 1: sort(cs.begin(), cs.end(), sort_by_polysemy_degree); // Sorting by polysemy degree
+        case 1: std::sort(cs.begin(), cs.end(), sort_by_polysemy_degree); // Sorting by polysemy degree
             break;
 
-        case 2: sort(cs.begin(), cs.end(), sort_by_explicit_sorting); // Explicit sorting
+        case 2: std::sort(cs.begin(), cs.end(), sort_by_explicit_sorting); // Explicit sorting
             break;
 
         default: // Impossible...
             break;
-
     }
-
 }
 
 void sort_by_id(CSentence & cs) {
@@ -909,17 +923,17 @@ int main(int argc, char *argv[]) {
         if (vm.count("expl")) {
             sort_method = explicit_sorting;
         }
-        
+
         // Program options: SSI Dijkstra method
-        
+
         if (vm.count("basic")) {
             dij_option = basic;
         }
-        
+
         if (vm.count("plus")) {
             dij_option = plus;
         }
-        
+
         if (vm.count("fast")) {
             dij_option = fast;
         }
@@ -954,7 +968,6 @@ int main(int argc, char *argv[]) {
     // Reading graph from binfile
 
     Kb::create_from_binfile(kb_binfile);
-    Kb & kb = Kb::instance();
     cout << cmdline << endl;
 
     // Reading CSentence (context...)
@@ -973,19 +986,6 @@ int main(int argc, char *argv[]) {
         kb.add_dictionary(); //TODO: Corregir referencia sin definir
     } 
      */
-
-    // Initializing parents and distance vectors (dijkstra_shortest_paths)	
-    size_t m = num_vertices(kb.graph());
-    if (parents.size() == m) {
-        std::fill(parents.begin(), parents.end(), Kb_vertex_t());
-    } else {
-        vector<Kb_vertex_t > (m).swap(parents); // reset parents vector
-    }
-    if (dist.size() == m) {
-        std::fill(dist.begin(), dist.end(), float());
-    } else {
-        vector<float>(m).swap(dist); // reset distance vector
-    }
 
     size_t l_n = 0;
     try {

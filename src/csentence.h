@@ -156,7 +156,12 @@ namespace ukb {
 	CSentence(const std::vector<std::string> & sent_);
 
 	CSentence(const CSentence & cs_) : v(cs_.v) , cs_id(cs_.cs_id) {};
-	CSentence & operator=(const CSentence & cs_);
+	CSentence & operator=(const CSentence & cs_);  
+        
+        CSentence(const std::vector<CWord> & cw_vec, const std::string id) {
+            this->v = cw_vec;
+            this->cs_id = id;
+        }
 
 	void append(const CSentence & cs_);
 

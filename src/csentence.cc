@@ -145,6 +145,7 @@ namespace ukb {
 	  m_V = cw_.m_V;
 	  m_ranks = cw_.m_ranks;
 	  m_disamb = cw_.m_disamb;
+          m_type = cw_.m_type;
 	}
 	return *this;
   }

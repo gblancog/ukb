@@ -11,6 +11,7 @@
 #include <list>
 #include <string>
 #include <map>
+#include <iomanip>
 #include <iterator>
 #include <algorithm>
 #include <ostream>
@@ -46,7 +47,6 @@
 // strong components
 
 #include <boost/graph/strong_components.hpp>
-
 
 namespace ukb {
 
@@ -279,13 +279,15 @@ namespace ukb {
         return distance;
     }
 
-    float Kb::obtain_distance_dijsktra_faster(Kb_vertex_t v1, Kb_vertex_t v2, Kb_vertex_t previous_synset, vector<Kb_vertex_t> & parents, vector<float> & dist) const {
+    float Kb::obtain_distance_dijsktra_faster(Kb_vertex_t v1, Kb_vertex_t v2, Kb_vertex_t previous_synset) {
 
         // Variable declarations
 
         float distance = 0; // value to return
 
         if (v1 != previous_synset) {
+
+            std::vector<Kb_vertex_t> parents;
 
             size_t m = num_vertices(*m_g);
             if (parents.size() == m) {
@@ -296,11 +298,10 @@ namespace ukb {
 
             // Hack to remove const-ness
             Kb & me = const_cast<Kb &> (*this);
-
-            vector<float> w;
-            vector<float> dist(m);
             property_map<Kb::boost_graph_t, boost::vertex_index_t>::type indexmap = get(vertex_index, *m_g);
             property_map<Kb::boost_graph_t, float edge_prop_t::*>::type wmap = get(&edge_prop_t::weight, *(me.m_g));
+            vector<float> w;
+            vector<float> dist(m);
 
             dijkstra_shortest_paths(*m_g,
                     v1,
@@ -310,14 +311,16 @@ namespace ukb {
                     get(vertex_index, *m_g))).
                     weight_map(wmap).
                     vertex_index_map(indexmap));
-
+            
+            parent_vector = parents;
+            distance_vector = dist;
         }
 
         // Getting the distance between vertex (v1) and vertex (v2)
         graph_traits<KbGraph>::vertex_iterator vi, vend;
         for (boost::tie(vi, vend) = vertices(*m_g); vi != vend; ++vi) {
             if (*vi == v2) { //Chosen vertex is our destination vertex (v2).
-                distance = dist[*vi];
+                distance = distance_vector[*vi];
             }
         }
         return distance;

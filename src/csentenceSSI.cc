@@ -15,20 +15,24 @@ namespace ukb {
 
     CWordSSI::CWordSSI(const std::string & w_, const std::string & id_, char pos_, cwtype type_, float wght_) {
 
-        this->w = w_;
+        w = w_;
         this->m_id = id_;
         this->m_pos = pos_;
         this->m_weight = wght_;
         this->m_type = type_;
+
+        // Debug
+        // cout << "Word: " << w << " + " << m_type << endl;
 
         switch (m_type) {
             case cw_concept:
 
                 Kb_vertex_t u;
                 bool P;
+
                 tie(u, P) = ukb::Kb::instance().get_vertex_by_name(w);
                 if (!P) {
-                    throw std::runtime_error("CWord concept " + w + " not in KB");
+                    throw std::runtime_error("CWord concept " + w + " not in KB. SSI");
                 }
                 m_syns.push_back(w);
                 m_V.push_back(make_pair(u, 1.0f));
@@ -69,21 +73,6 @@ namespace ukb {
             m_type = type;
             m_disamb = true;
         }
-    }
-
-    CWordSSI & CWordSSI::operator=(const CWordSSI & cw_) {
-        if (&cw_ != this) {
-            w = cw_.w;
-            m_id = cw_.m_id;
-            m_weight = cw_.m_weight;
-            m_pos = cw_.m_pos;
-            m_syns = cw_.m_syns;
-            m_V = cw_.m_V;
-            m_ranks = cw_.m_ranks;
-            m_disamb = cw_.m_disamb;
-            m_type = cw_.m_type; //@Aritza: Añadido
-        }
-        return *this;
     }
 
     std::ostream & CSentenceSSI::print_csent_simple_all(std::ostream & o, bool no_cnt, bool cnt_word) const {

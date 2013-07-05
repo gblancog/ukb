@@ -18,11 +18,6 @@ namespace ukb {
         CWordSSI(const std::string & word, const std::string & id, char pos, cwtype type, float weight);
         CWordSSI(const std::string & word, const std::string & id, char pos, cwtype type, float weight, std::string vertex_string, Kb_vertex_t vertex);
 
-        bool is_tgtword_nopv() const {
-            return (m_type == cw_tgtword_nopv);
-        }
-
-        CWordSSI & operator=(const CWordSSI & cs_);
     };
 
     class CSentenceSSI : public CSentence {
