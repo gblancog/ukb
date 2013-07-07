@@ -75,6 +75,7 @@ void create_distance_matrix(vector<Kb_vertex_t> I, vector<CWordSSI> P) {
     Kb_vertex_t previous_vertex = 0;
     for (unsigned int i = 0; i < isize; i++) {
         Kb_vertex_t actual_isynset = I.at(i);
+        int r = 0;
         for (unsigned int j = 0; j < psize; j++) {
             CWordSSI actual_word = P.at(j);
             vector<string> synset_vector = actual_word.get_syns_vector();
@@ -83,7 +84,9 @@ void create_distance_matrix(vector<Kb_vertex_t> I, vector<CWordSSI> P) {
                 bool x;
                 tie(actual_synset, x) = Kb::instance().get_vertex_by_name(synset_vector.at(k));
                 if (x) {
-                    dijkstra_matrix[k][i] = Kb::instance().obtain_distance_dijsktra_faster(actual_isynset, actual_synset, previous_vertex);
+                    dijkstra_matrix[r][i] = Kb::instance().obtain_distance_dijsktra_faster(actual_isynset, actual_synset, previous_vertex);
+                    // cout << "Create: [" << r << "," << i << "]" << endl;
+                    r++;
                     previous_vertex = actual_isynset;
                 }
             }
@@ -106,6 +109,7 @@ void update_distance_matrix(Kb_vertex_t src, vector<CWordSSI> P, int rowm, int c
             tie(actual_synset, x) = Kb::instance().get_vertex_by_name(synset_vector.at(k));
             if (x) {
                 dijkstra_matrix[modifing_row][modifing_column] = Kb::instance().obtain_distance_dijsktra_faster(src, actual_synset, previous_vertex);
+                // cout << "Update: [" << modifing_row << "," << modifing_column << "]" << endl;
                 modifing_row++;
             }
         }
@@ -309,8 +313,7 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
                         float actual_weight = 0.0;
                         if (option) {
                             actual_weight = dijkstra_matrix[row][k];
-                            cout << "Row: " << row << " + Column: " << k << " (Total:" << rows << ")" << endl;
-                            cout << "Row_Mod: " << row_modifier << " + Column_Mod: " << column_modifier << endl;
+                            // cout << "Operate: [" << row << "," << k << "]" << endl;
                         } else {
                             actual_weight = Kb::instance().obtain_distance_dijsktra(actual_synset, actual_isynset);
                         }
