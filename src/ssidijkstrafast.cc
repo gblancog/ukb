@@ -109,6 +109,7 @@ void update_distance_matrix(Kb_vertex_t src, vector<CWordSSI> P, int rowm, int c
             tie(actual_synset, x) = Kb::instance().get_vertex_by_name(synset_vector.at(k));
             if (x) {
                 dijkstra_matrix[modifing_row][modifing_column] = Kb::instance().obtain_distance_dijsktra_faster(src, actual_synset, previous_vertex);
+                previous_vertex = src;
                 // cout << "Update: [" << modifing_row << "," << modifing_column << "]" << endl;
                 modifing_row++;
             }
@@ -1026,7 +1027,7 @@ int main(int argc, char *argv[]) {
             }
             //@Aritza: Cambiamos el metodo por el cual se imprimen las palabras
             cs.print_csent_simple_all(cout, no_cnt, cnt_word);
-
+         
             cs = CSentenceSSI(); // Next iteration ...		
         }
     } catch (std::exception & e) {

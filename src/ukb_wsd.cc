@@ -211,9 +211,9 @@ void dis_csent_ppr_by_word(istream & fh_in,
   CSentence cs;
 
   size_t l_n = 0;
-
+  
   while (cs.read_aw(fh_in, l_n)) {
-
+      
 	// fall back to static if csentence has only one word
 	if (cs.size() == 1) {
       if (glVars::debug::warning)
@@ -226,7 +226,7 @@ void dis_csent_ppr_by_word(istream & fh_in,
 	if (out_semcor) cs.print_csent_semcor_aw(cout);
 	else cs.print_csent_simple(cout);
 
-	//cout << cs << '\n';
+	//cout << cs << '\n';      
 	cs = CSentence();
   }
 }
