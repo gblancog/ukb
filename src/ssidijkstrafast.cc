@@ -85,7 +85,6 @@ void create_distance_matrix(vector<Kb_vertex_t> I, vector<CWordSSI> P) {
                 tie(actual_synset, x) = Kb::instance().get_vertex_by_name(synset_vector.at(k));
                 if (x) {
                     dijkstra_matrix[r][i] = Kb::instance().obtain_distance_dijsktra_faster(actual_isynset, actual_synset, previous_vertex);
-                    // cout << "Create: [" << r << "," << i << "]" << endl;
                     r++;
                     previous_vertex = actual_isynset;
                 }
@@ -110,7 +109,6 @@ void update_distance_matrix(Kb_vertex_t src, vector<CWordSSI> P, int rowm, int c
             if (x) {
                 dijkstra_matrix[modifing_row][modifing_column] = Kb::instance().obtain_distance_dijsktra_faster(src, actual_synset, previous_vertex);
                 previous_vertex = src;
-                // cout << "Update: [" << modifing_row << "," << modifing_column << "]" << endl;
                 modifing_row++;
             }
         }
@@ -170,10 +168,10 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
     int row_modifier = 0; // How many matrix rows we already used
     int column_modifier = 0; // In which column we need to update the matrix info next
 
+    // Iterator stuff
     CSentence::iterator it;
-    CSentence::iterator end = cs.end();
-    //@Aritza: Variable que usaremos para saber que elemento del Csentences hemos añadido ya a la lista de interpreted y borrarlo de los pending 	
-    int posicion;
+    CSentence::iterator end = cs.end(); 	
+    int position; // Control we can use just in case of having type 3 words
 
     string id = cs.id();
 
@@ -181,7 +179,7 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
     for (it = cs.begin(); it != end; ++it) {
         vector<string> syns = it->get_syns_vector();
         int senses = syns.size();
-        if (senses == 0) // No senses for this word, dude!
+        if (senses == 0) // No senses for this word, mate!
         {
             continue; // As this word doesn't is in KbGraph, we continue processing other words
         } else {
@@ -192,9 +190,7 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
                 tie(aux_vertex, u) = Kb::instance().get_vertex_by_name(syns.at(0));
                 if (u) {
                     CWordSSI aux_cword;
-                    //@Aritza: Cambiar a la nueva version con el type()
                     aux_cword = CWordSSI(it->word(), it->id(), it->get_pos(), it->type(), it->get_weight(), syns.at(0), aux_vertex);
-                    //@Aritza: Creamos un if para el nuevo tipo de palabra 3, ya que estas no tienen q entrar en el verctor de interpreted y puede ser monosemica
                     if (!it->is_tgtword_nopv()) {
                         interpreted.push_back(aux_vertex);
                         solution_vector.push_back(aux_cword);
@@ -205,7 +201,6 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
             } else // Polisemical... pending disambiguation 
             {
                 CWordSSI aux_cword;
-                //@Aritza: Cambiar a la nueva version con el type()
                 aux_cword = CWordSSI(it->word(), it->id(), it->get_pos(), it->type(), it->get_weight());
                 pending.push_back(aux_cword);
             }
@@ -213,8 +208,6 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
     }
 
     // First step - part two: If there are no monosemical words, pass one pair <word, sense> from P to I using FSI
-
-    //@Aritza: Cambiamos if por for por si la 1º o las siguientes palabras llevan un 3, lo recorre asta q encuentra una palabra q no sea 3
 
     for (unsigned int o = 0; interpreted.empty() && o < pending.size(); o++) {
         CWordSSI word_for_disambiguate = pending.at(o);
@@ -254,7 +247,6 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
                         number_of_synsets++;
                     }
                 }
-                //@Aritza: Añadimos la condicion para que solo las palabras que no sean de tipo 3 se tengan en cuenta
                 if (number_of_synsets > 0 && !word_for_disambiguate.is_tgtword_nopv()) {
                     float NewValue = 0.0;
                     NewValue = total_weight / number_of_synsets;
@@ -262,7 +254,7 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
                         MaxValue = NewValue;
                         BestSense = actual_synset;
                         index = j;
-                        posicion = o;
+                        position = o;
                     }
                 }
             }
@@ -270,19 +262,16 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
         if (MaxValue > 0) {
             interpreted.push_back(BestSense);
             CWordSSI resolved;
-            //@Aritza: Cambiar a la nueva version con el type()
             resolved = CWordSSI(word_for_disambiguate.word(), word_for_disambiguate.id(), word_for_disambiguate.get_pos(), word_for_disambiguate.type(), word_for_disambiguate.get_weight(), the_synset_vector.at(index), BestSense);
             solution_vector.push_back(resolved);
-            //@Aritza: Ahora no tenemos que eliminar la primera, sino la que hemos metido en el interpreted
-            pending.erase(pending.begin() + posicion);
+            pending.erase(pending.begin() + position);
         }
     }
     // End FSI
 
     // Second step: Disambiguation
 
-    //@Aritza: Si todas las palabras son de tipo 3 es imposible desambiguar el contexto
-    if (interpreted.empty()) cout << "Todas las palabras son de tipo: target 'nopv' word (3), por tanto no es posible desambiguar el contexto: " << cs.id() << endl;
+    if (interpreted.empty()) cout << "All the words of the context are target 'nopv' word type, so is not possible to disambiguate the context: " << cs.id() << endl;
 
     if (!interpreted.empty()) // If there is only one word, interpreted will be empty... 
     {
@@ -314,7 +303,6 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
                         float actual_weight = 0.0;
                         if (option) {
                             actual_weight = dijkstra_matrix[row][k];
-                            // cout << "Operate: [" << row << "," << k << "]" << endl;
                         } else {
                             actual_weight = Kb::instance().obtain_distance_dijsktra(actual_synset, actual_isynset);
                         }
@@ -365,12 +353,10 @@ CSentenceSSI ssi_dijkstra_fast(CSentenceSSI cs, int option) {
                 }
             }
             if (MaxValue > 0) {
-                //@Aritza: Creamos un if para el nuevo tipo de palabra 3, ya que estas no tienen q entrar en el vector de interpreted
                 if (!actual_word.is_tgtword_nopv()) {
                     interpreted.push_back(BestSense);
                 }
                 CWordSSI resolved;
-                //@Aritza: Cambiar a la nueva version con el type()
                 resolved = CWordSSI(actual_word.word(), actual_word.id(), actual_word.get_pos(), actual_word.type(), actual_word.get_weight(), the_synset_vector.at(index), BestSense);
                 solution_vector.push_back(resolved);
                 pending.erase(pending.begin());
@@ -394,10 +380,10 @@ CSentenceSSI ssi_dijkstra_plus(CSentenceSSI cs, int option) {
     vector<CWordSSI> pending; // P
     vector<CWordSSI> solution_vector; // Auxiliar CWord for solution
 
+    // Iterator stuff
     CSentence::iterator it;
-    CSentence::iterator end = cs.end();
-    //@Aritza: Variable que usaremos para saber que elemento del Csentences hemos añadido ya a la lista de interpreted y borrarlo de los pending 	
-    int posicion;
+    CSentence::iterator end = cs.end(); 	
+    int position;
 
     string id = cs.id();
 
@@ -416,9 +402,7 @@ CSentenceSSI ssi_dijkstra_plus(CSentenceSSI cs, int option) {
                 tie(aux_vertex, u) = Kb::instance().get_vertex_by_name(syns.at(0));
                 if (u) {
                     CWordSSI aux_cword;
-                    //@Aritza: Cambiar a la nueva version con el type()
                     aux_cword = CWordSSI(it->word(), it->id(), it->get_pos(), it->type(), it->get_weight(), syns.at(0), aux_vertex);
-                    //@Aritza: Creamos un if para el nuevo tipo de palabra 3, ya que estas no tienen q entrar en el verctor de interpreted y puede ser monosemica
                     if (!it->is_tgtword_nopv()) {
                         interpreted.push_back(aux_vertex);
                         solution_vector.push_back(aux_cword);
@@ -429,7 +413,6 @@ CSentenceSSI ssi_dijkstra_plus(CSentenceSSI cs, int option) {
             } else // Polisemical... pending disambiguation 
             {
                 CWordSSI aux_cword;
-                //@Aritza: Cambiar a la nueva version con el type()
                 aux_cword = CWordSSI(it->word(), it->id(), it->get_pos(), it->type(), it->get_weight());
                 pending.push_back(aux_cword);
             }
@@ -437,8 +420,6 @@ CSentenceSSI ssi_dijkstra_plus(CSentenceSSI cs, int option) {
     }
 
     // First step - part two: If there are no monosemical words, pass one pair <word, sense> from P to I using FSI
-
-    //@Aritza: Cambiamos if por for por si la 1º o las siguientes palabras llevan un 3, lo recorre asta q encuentra una palabra q no sea 3
 
     for (unsigned int o = 0; interpreted.empty() && o < pending.size(); o++) {
         CWordSSI word_for_disambiguate = pending.at(o);
@@ -478,7 +459,6 @@ CSentenceSSI ssi_dijkstra_plus(CSentenceSSI cs, int option) {
                         number_of_synsets++;
                     }
                 }
-                //@Aritza: Añadimos la condicion para que solo las palabras que no sean de tipo 3 se tengan en cuenta
                 if (number_of_synsets > 0 && !word_for_disambiguate.is_tgtword_nopv()) {
                     float NewValue = 0.0;
                     NewValue = total_weight / number_of_synsets;
@@ -486,7 +466,7 @@ CSentenceSSI ssi_dijkstra_plus(CSentenceSSI cs, int option) {
                         MaxValue = NewValue;
                         BestSense = actual_synset;
                         index = j;
-                        posicion = o;
+                        position = o;
                     }
                 }
             }
@@ -494,19 +474,16 @@ CSentenceSSI ssi_dijkstra_plus(CSentenceSSI cs, int option) {
         if (MaxValue > 0) {
             interpreted.push_back(BestSense);
             CWordSSI resolved;
-            //@Aritza: Cambiar a la nueva version con el type()
             resolved = CWordSSI(word_for_disambiguate.word(), word_for_disambiguate.id(), word_for_disambiguate.get_pos(), word_for_disambiguate.type(), word_for_disambiguate.get_weight(), the_synset_vector.at(index), BestSense);
             solution_vector.push_back(resolved);
-            //@Aritza: Ahora no tenemos que eliminar la primera, sino la que hemos metido en el interpreted
-            pending.erase(pending.begin() + posicion);
+            pending.erase(pending.begin() + position);
         }
     }
     // End FSI
 
     // Second step: Disambiguation
 
-    //@Aritza: Si todas las palabras son de tipo 3 es imposible desambiguar el contexto
-    if (interpreted.empty()) cout << "Todas las palabras son de tipo: target 'nopv' word (3), por tanto no es posible desambiguar el contexto: " << cs.id() << endl;
+    if (interpreted.empty()) cout << "All the words of the context are target 'nopv' word type, so is not possible to disambiguate the context: " << cs.id() << endl;
 
     if (!interpreted.empty()) // If there is only one word, interpreted will be empty... 
     {
@@ -535,10 +512,6 @@ CSentenceSSI ssi_dijkstra_plus(CSentenceSSI cs, int option) {
                         if (option) {
                             actual_weight = Kb::instance().obtain_distance_dijsktra_faster(actual_synset, actual_isynset, previous_vertex);
                             previous_vertex = actual_synset;
-                            /* //Debug
-                            if (actual_word.word().compare("together") == 0){
-                                show_path(actual_synset, actual_isynset, Kb::instance().graph());
-                            } */
                         } else {
                             actual_weight = Kb::instance().obtain_distance_dijsktra(actual_synset, actual_isynset);
                         }
@@ -589,10 +562,8 @@ CSentenceSSI ssi_dijkstra_plus(CSentenceSSI cs, int option) {
                 }
             }
             if (MaxValue > 0) {
-                //@Aritza: Creamos un if para el nuevo tipo de palabra 3, ya que estas no tienen q entrar en el vector de interpreted
                 if (!actual_word.is_tgtword_nopv()) interpreted.push_back(BestSense);
                 CWordSSI resolved;
-                //@Aritza: Cambiar a la nueva version con el type()
                 resolved = CWordSSI(actual_word.word(), actual_word.id(), actual_word.get_pos(), actual_word.type(), actual_word.get_weight(), the_synset_vector.at(index), BestSense);
                 solution_vector.push_back(resolved);
                 pending.erase(pending.begin());
@@ -617,7 +588,7 @@ CSentenceSSI ssi_dijkstra(CSentenceSSI cs, int option) {
     for (it = cs.begin(); it != end; ++it) {
         vector<string> syns = it->get_syns_vector();
         int senses = syns.size();
-        if (senses == 0) // No senses for this word, dude!
+        if (senses == 0) // No senses for this word, mate!
         {
             continue; // As this word doesn't is in KbGraph, we continue processing other words
         } else {
@@ -628,9 +599,7 @@ CSentenceSSI ssi_dijkstra(CSentenceSSI cs, int option) {
                 tie(aux_vertex, a) = Kb::instance().get_vertex_by_name(syns.at(0));
                 if (a) {
                     CWordSSI aux_cword;
-                    //@Aritza: Cambiar el m_type al de la nueva version
                     aux_cword = CWordSSI(it->word(), it->id(), it->get_pos(), it->type(), it->get_weight(), syns.at(0), aux_vertex);
-                    //@Aritza: Creamos un if para el nuevo tipo de palabra 3, ya que estas no tienen q entrar en el verctor de interpreted y puede ser monosemica. Si es monosemica la introducimos directamente en el vector pending
 
                     if (!it->is_tgtword_nopv()) {
                         interpreted.push_back(aux_vertex);
@@ -642,15 +611,13 @@ CSentenceSSI ssi_dijkstra(CSentenceSSI cs, int option) {
             } else // Polisemical... pending disambiguation
             {
                 CWordSSI aux_cword;
-                //@Aritza: Cambiar el m_type al de la nueva version, incluyendo el it->type()
                 aux_cword = CWordSSI(it->word(), it->id(), it->get_pos(), it->type(), it->get_weight());
                 pending.push_back(aux_cword);
             }
         }
     }
 
-    //Aritza: Si el contexto no va a poder ser desambiguado mostramos un mensaje por pantalla indicandolo
-    if (interpreted.empty()) cout << "No hay ninguna palabra monosémica ni ningún concepto, por tanto no es posible desambiguar el contexto: " << cs.id() << endl;
+    if (interpreted.empty()) cout << "There are no concepts or monosemous words, so it is not possible to disambiguate the context: " << cs.id() << endl;
 
     // Second step: Disambiguation
     if (!interpreted.empty()) {
@@ -699,10 +666,8 @@ CSentenceSSI ssi_dijkstra(CSentenceSSI cs, int option) {
                 }
             }
             if (MaxValue > 0) {
-                //@Aritza: Creamos un if para el nuevo tipo de palabra 3, ya que estas no tienen q entrar en el vector de interpreted
                 if (!actual_word.is_tgtword_nopv()) interpreted.push_back(BestSense);
                 CWordSSI resolved;
-                //@Aritza: Cambiar el m_type al de la nueva version
                 resolved = CWordSSI(actual_word.word(), actual_word.id(), actual_word.get_pos(), actual_word.type(), actual_word.get_weight(), the_synset_vector.at(index), BestSense);
                 solution_vector.push_back(resolved);
                 pending.erase(pending.begin());
@@ -809,14 +774,20 @@ int main(int argc, char *argv[]) {
         fast
     };
 
+    /* 
+     * ---------------- Default options: 
+     * No explicit sorting method 
+     * Faster implementation of Dijsktra shortests paths
+     * SSI-Dijkstra-Fast usage
+     * No output sorting after desambiguating the context
+     * Show already disambiguated words 
+     * Don't show cw_ctxword type words
+     ------------------ */
     sorting sort_method = no_explicit;
     dijkstra_option dsp_option = faster;
     dijkstra_method dij_option = fast;
-
     bool pretty_mode = false;
-    //@Aritza:añadinos la nueva variable para especificar que no queremos mostros las palabras ya desambiguadas	
     bool no_cnt = false;
-
     bool cnt_word = false;
 
     string cmdline("!! -v ");
@@ -831,7 +802,7 @@ int main(int argc, char *argv[]) {
 
     using namespace boost::program_options;
 
-    const char desc_header[] = "SSI_Dijkstra: Here comes a description";
+    const char desc_header[] = "SSI_Dijkstra: A graph-based disambiguation system based on UKB KBGraphs";
 
     options_description po_general("General");
 
@@ -840,7 +811,6 @@ int main(int argc, char *argv[]) {
             ("version", "Show version")
             ("kb_binfile,K", value<string > (), "Binary file of KB (see compile_kb). Default is kb_wnet_weights.bin")
             ("dict_file,D", value<string > (), "Dictionary text file. Default is dict.txt")
-            ("pretty", "Use this option for sort the words by id before disambiguation")
             ;
 
     options_description po_sorting("Sorting");
@@ -848,23 +818,21 @@ int main(int argc, char *argv[]) {
             ("nexp", "No explicit sorting. This is default option")
             ("poly", "Sorting by polysemy degree")
             ("expl", "Sorting by explicit sorting (given by user)")
+            ("pretty", "Use this option for sort the words by id after disambiguation")
             ;
 
     options_description po_method("SSI Dijkstra method");
     po_method.add_options()
             ("basic", "Basic SSI Dijkstra method")
             ("plus", "SSI Dijkstra plus method")
-            ("fast", "SSI Dijstra fast method")
+            ("fast", "SSI Dijstra fast method. This is default option")
             ;
 
     options_description po_ssid("SSI Dijkstra options");
     po_ssid.add_options()
             ("no-opt", "Use a normal invocation to dijkstra_shortest_paths instead of faster one")
-            ("ssid", "Use SSI-Dijkstra algorithm instead of SSI-Dijkstra+")
-            //@Aritza: Añadimos una nueva opcion por si no queremos que se muestren los conceptos
-            ("no_cnt", "No muestra el cnt")
-            //@Aritza: Añadimos una nueva opcion por si queremos que las palabras de tipo cw_ctxword se muestren
-            ("cnt_word", "Mostrar los cnt word");
+            ("no_cnt", "Doesn't show the concepts (already disambiguated words)")
+            ("cnt_word", "Show cw_ctxword type words");
     ;
 
     options_description po_hidden("Hidden");
@@ -910,10 +878,6 @@ int main(int argc, char *argv[]) {
             glVars::dict_filename = vm["dict_file"].as<string > ();
         }
 
-        if (vm.count("pretty")) {
-            pretty_mode = true;
-        }
-
         // Program options: Sorting
 
         if (vm.count("nexp")) {
@@ -948,11 +912,16 @@ int main(int argc, char *argv[]) {
             dsp_option = normal;
         }
 
-        //@Aritza: Additional options
+        // Output showing options
 
-        if (vm.count("no_cnt")) no_cnt = true;
-        if (vm.count("cnt_word")) cnt_word = true;
-
+        if (vm.count("no_cnt")) {
+            no_cnt = true;
+        }
+        
+        if (vm.count("cnt_word")) {
+            cnt_word = true;
+        }
+            
         // Input file
 
         if (vm.count("input_file")) {
@@ -983,29 +952,10 @@ int main(int argc, char *argv[]) {
     }
 
     CSentenceSSI cs;
-    // Adding dictionary 
-    /* 
-       if (insert_all_dict) {
-        //@Aritza: Ya no es necesario pasarle el peso
-        kb.add_dictionary(); //TODO: Corregir referencia sin definir
-    } 
-     */
 
     size_t l_n = 0;
     try {
         while (cs.read_aw(fh_in, l_n)) {
-            /* 
-               if (!insert_all_dict) {
-                // Add CSentence words to graph
-                CSentenceSSI::iterator it = cs.begin();
-                CSentenceSSI::iterator end = cs.end();
-                for (; it != end; ++it) {
-                    //@Aritza: Ya no es necesario pasarle el peso
-                    kb.add_token(it->word()); //TODO: Corregir referencia sin definir
-                }
-            } 
-             */
-
             sort_words(cs, sort_method);
             switch (dij_option) {
                 case basic:
@@ -1025,7 +975,6 @@ int main(int argc, char *argv[]) {
             if (pretty_mode) {
                 sort_by_id(cs); // Just a little pretty thing
             }
-            //@Aritza: Cambiamos el metodo por el cual se imprimen las palabras
             cs.print_csent_simple_all(cout, no_cnt, cnt_word);
          
             cs = CSentenceSSI(); // Next iteration ...		
